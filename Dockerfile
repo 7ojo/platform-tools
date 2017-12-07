@@ -1,40 +1,19 @@
-FROM debian:stretch
+FROM alpine:3.7
 MAINTAINER Jarkko Haapalainen <jarkko@viidakko.fi>
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update &&\
- apt-get install -y build-essential debhelper devscripts git libncurses5-dev libssl-dev zlib1g-dev libcurl4-openssl-dev libexpat1-dev patchelf
-RUN mkdir /tools
-
-# Install VIM
-RUN git clone https://github.com/vim/vim.git /src/vim
-RUN cd /src/vim ;\
- ./configure --prefix=/tools ;\
- make ;\
- make install
-
-# Install Git
-RUN git clone git://git.kernel.org/pub/scm/git/git.git /src/git
-RUN apt-get install
-RUN cd /src/git ;\
- make configure ;\
- ./configure --prefix=/tools ;\
- make ;\
- make install
-
-# Environment
-RUN mkdir -p /tools/lib64 /tools/lib /tools/usr/lib ;\
- cp -a /lib64/* /tools/lib64/ ;\
- cp -a /lib/* /tools/lib/ ;\
- cp -a /usr/lib/* /tools/usr/lib/
+RUN apk update
+RUN apk add vim git patchelf rsync
+RUN mkdir /tools;\
+ rsync -a -H --exclude=tools --exclude=sys --exclude=proc / /tools/
 
 # Patch binaries to new shared library path
 #RUN patchelf patchelf --add-needed libnghttp2.so.14 /tools/libexec/git-core/git-remote-https
 
-#RUN for i in /tools/bin/* /tools/libexec/git-core/*; do\
-# patchelf --set-interpreter /tools/lib64/ld-linux-x86-64.so.2 $i;\
-# patchelf --set-rpath /tools/lib:/tools/lib64:/tools/lib/x86_64-linux-gnu:/tools/usr/lib:/tools/usr/lib/x86_64-linux-gnu $i;\
-# patchelf --shrink-rpath $i;\
-# echo "$i";\
-# done
+RUN for i in /tools/usr/bin/vim; do\
+ echo "File: $i";\
+ patchelf --set-interpreter /tools/lib/ld-musl-x86_64.so.1 $i;\
+ patchelf --set-rpath /tools/lib:/tools/usr/lib $i;\
+ patchelf --shrink-rpath $i;\
+ done ;\
+ exit 0
 
 CMD bash
